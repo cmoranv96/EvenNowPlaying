@@ -1,0 +1,14 @@
+{
+  "package_id": "com.carlosmoran.evennowplaying",
+  "edition": "202601",
+  "name": "Even Now Playing",
+  "version": "0.1.0",
+  "min_app_version": "0.1.0",
+  "min_sdk_version": "0.0.10",
+  "tagline": "Now playing controls for YouTube Music",
+  "description": "Shows the current YouTube Music track on Even G2 and provides a simple control surface.",
+  "author": "Carlos Moran",
+  "permissions": [],
+  "supported_languages": ["en", "es"],
+  "entrypoint": "index.html"
+}

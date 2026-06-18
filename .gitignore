@@ -1,0 +1,11 @@
+.gradle/
+.idea/
+build/
+local.properties
+node_modules/
+dist/
+.tools/
+*.ehpk
+public/*.apk
+
+app/build/
