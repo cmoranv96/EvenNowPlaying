@@ -80,7 +80,7 @@ let androidBridgeConnected = false;
 let youtubeMusicConnected = false;
 let evenBridge: EvenAppBridge | null = null;
 let evenPageCreated = false;
-let selectedControlIndex = 1;
+let selectedControlIndex = 0;
 let glassesRenderInFlight = false;
 let glassesRenderQueued = false;
 let lastActivationAt = 0;
@@ -343,6 +343,14 @@ function displayListLabel(control: PlayerControl) {
   return `  ${control.label}  `;
 }
 
+function normalizedControlLabel(value: string | undefined) {
+  return value
+    ?.replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&")
+    .trim();
+}
+
 function moveSelection(direction: -1 | 1) {
   lastActivationAt = 0;
   selectedControlIndex = (selectedControlIndex + direction + controls.length) % controls.length;
@@ -356,6 +364,27 @@ function activateSelectedControl() {
 
   lastActivationAt = now;
   runControlAction(selectedControl().action);
+}
+
+function activateEventControl(event: {
+  listEvent?: { currentSelectItemIndex?: number; currentSelectItemName?: string };
+}) {
+  const eventControlIndex = controlIndexFromListEvent(event);
+  if (eventControlIndex !== undefined) {
+    updateSelectedControlIndex(eventControlIndex);
+    activateControlIndex(eventControlIndex);
+    return;
+  }
+
+  activateSelectedControl();
+}
+
+function activateControlIndex(controlIndex: number) {
+  const now = Date.now();
+  if (now - lastActivationAt < 650) return;
+
+  lastActivationAt = now;
+  runControlAction(controls[controlIndex]?.action ?? selectedControl().action);
 }
 
 function runControlAction(action: ControlAction | string) {
@@ -378,7 +407,8 @@ function playPause() {
 
 async function runCommand(command: BridgeCommand) {
   const now = Date.now();
-  if (command === lastCommand && now - lastCommandAt < 900) return;
+  const duplicateCommandThrottleMs = command === "previous" ? 600 : 900;
+  if (command === lastCommand && now - lastCommandAt < duplicateCommandThrottleMs) return;
 
   lastCommand = command;
   lastCommandAt = now;
@@ -524,19 +554,18 @@ async function initializeEvenBridge() {
   try {
     evenBridge = await withTimeout(waitForEvenAppBridge(), 1500);
     evenBridge.onEvenHubEvent((event) => {
-      const previousSelectionIndex = selectedControlIndex;
       const normalizedEventType = normalizeEvenEvent(event);
-      const syncedSelection = syncSelectionFromListEvent(event);
-      const selectionChanged = previousSelectionIndex !== selectedControlIndex;
 
       console.log("[Even Now Playing] EvenHub event", event);
 
-      if (normalizedEventType === "click" || (normalizedEventType === "other" && syncedSelection && !selectionChanged)) {
-        activateSelectedControl();
+      if (normalizedEventType === "click") {
+        activateEventControl(event);
       } else if (normalizedEventType === "previous") {
-        if (!syncedSelection) moveSelection(-1);
+        moveSelection(-1);
       } else if (normalizedEventType === "next") {
-        if (!syncedSelection) moveSelection(1);
+        moveSelection(1);
+      } else {
+        activateEventControl(event);
       }
     });
     await renderGlasses();
@@ -548,28 +577,34 @@ async function initializeEvenBridge() {
 function syncSelectionFromListEvent(event: {
   listEvent?: { currentSelectItemIndex?: number; currentSelectItemName?: string };
 }) {
-  const itemIndex = event.listEvent?.currentSelectItemIndex;
-  const itemName = event.listEvent?.currentSelectItemName;
-
-  if (typeof itemIndex === "number" && itemIndex >= 0 && itemIndex < controls.length) {
-    updateSelectedControlIndex(itemIndex);
-    return true;
-  }
-
-  if (typeof itemIndex === "number" && itemIndex > 0 && itemIndex <= controls.length) {
-    updateSelectedControlIndex(itemIndex - 1);
-    return true;
-  }
-
-  const nameIndex = controls.findIndex((control, index) => {
-    return displayLabel(control) === itemName || displayListLabel(control) === itemName;
-  });
-  if (nameIndex >= 0) {
-    updateSelectedControlIndex(nameIndex);
+  const controlIndex = controlIndexFromListEvent(event);
+  if (controlIndex !== undefined) {
+    updateSelectedControlIndex(controlIndex);
     return true;
   }
 
   return false;
+}
+
+function controlIndexFromListEvent(event: {
+  listEvent?: { currentSelectItemIndex?: number; currentSelectItemName?: string };
+}) {
+  const itemIndex = event.listEvent?.currentSelectItemIndex;
+  const itemName = normalizedControlLabel(event.listEvent?.currentSelectItemName);
+
+  const nameIndex = controls.findIndex((control) => {
+    return normalizedControlLabel(displayLabel(control)) === itemName
+      || normalizedControlLabel(displayListLabel(control)) === itemName;
+  });
+  if (nameIndex >= 0) {
+    return nameIndex;
+  }
+
+  if (typeof itemIndex === "number" && itemIndex >= 0 && itemIndex < controls.length) {
+    return itemIndex;
+  }
+
+  return undefined;
 }
 
 function updateSelectedControlIndex(nextIndex: number) {

@@ -19,15 +19,7 @@ class YoutubeMusicController(
         val playbackState = controller.playbackState
         val state = playbackState?.state
         val durationMs = metadata.getLong(MediaMetadata.METADATA_KEY_DURATION).coerceAtLeast(0L)
-        val basePositionMs = (playbackState?.position ?: 0L).coerceAtLeast(0L)
-        val lastPositionUpdateTimeMs = (playbackState?.lastPositionUpdateTime ?: 0L).coerceAtLeast(0L)
-        val playbackSpeed = playbackState?.playbackSpeed ?: 1f
-        val positionMs = if (state == PlaybackState.STATE_PLAYING && lastPositionUpdateTimeMs > 0L) {
-            val elapsedMs = SystemClock.elapsedRealtime() - lastPositionUpdateTimeMs
-            (basePositionMs + (elapsedMs * playbackSpeed).toLong()).coerceIn(0L, durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE)
-        } else {
-            basePositionMs
-        }
+        val positionMs = currentPositionMs(playbackState, durationMs)
 
         if (title.isBlank() && artist.isBlank()) return null
 
@@ -64,7 +56,31 @@ class YoutubeMusicController(
     }
 
     fun previous() {
-        controller.transportControls.skipToPrevious()
+        val positionMs = currentPositionMs(
+            playbackState = controller.playbackState,
+            durationMs = controller.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)?.coerceAtLeast(0L) ?: 0L,
+        )
+
+        if (positionMs > RESTART_TRACK_THRESHOLD_MS) {
+            controller.transportControls.seekTo(0L)
+        } else {
+            controller.transportControls.skipToPrevious()
+        }
+    }
+
+    private fun currentPositionMs(playbackState: PlaybackState?, durationMs: Long): Long {
+        val state = playbackState?.state
+        val basePositionMs = (playbackState?.position ?: 0L).coerceAtLeast(0L)
+        val lastPositionUpdateTimeMs = (playbackState?.lastPositionUpdateTime ?: 0L).coerceAtLeast(0L)
+        val playbackSpeed = playbackState?.playbackSpeed ?: 1f
+
+        if (state != PlaybackState.STATE_PLAYING || lastPositionUpdateTimeMs <= 0L) {
+            return basePositionMs
+        }
+
+        val elapsedMs = SystemClock.elapsedRealtime() - lastPositionUpdateTimeMs
+        return (basePositionMs + (elapsedMs * playbackSpeed).toLong())
+            .coerceIn(0L, durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE)
     }
 
     fun registerCallback(callback: MediaController.Callback) {
@@ -73,5 +89,9 @@ class YoutubeMusicController(
 
     fun unregisterCallback(callback: MediaController.Callback) {
         controller.unregisterCallback(callback)
+    }
+
+    private companion object {
+        const val RESTART_TRACK_THRESHOLD_MS = 3_000L
     }
 }
