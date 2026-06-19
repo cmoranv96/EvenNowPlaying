@@ -34,10 +34,10 @@ button {
 .surface {
   width: min(100vw, 576px);
   height: min(100vh, 288px);
-  padding: 30px 28px 18px;
+  padding: 24px 28px 12px;
   display: grid;
-  grid-template-rows: 28px 1fr 82px 18px;
-  gap: 12px;
+  grid-template-rows: 24px 1fr 78px 16px 14px;
+  gap: 8px;
   overflow: hidden;
   background: #090909;
 }
@@ -283,6 +283,20 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.debug {
+  margin: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 430px) {

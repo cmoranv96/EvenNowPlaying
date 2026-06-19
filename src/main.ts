@@ -86,6 +86,7 @@ let glassesRenderQueued = false;
 let lastActivationAt = 0;
 let lastCommandAt = 0;
 let lastCommand: BridgeCommand | null = null;
+let lastEvenEventSummary = "event: none";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -134,6 +135,7 @@ function render() {
       </div>
 
       <p class="hint">${escapeHtml(hint)}</p>
+      <p class="debug">${escapeHtml(lastEvenEventSummary)}</p>
     </section>
   `;
 }
@@ -557,6 +559,8 @@ async function initializeEvenBridge() {
       const normalizedEventType = normalizeEvenEvent(event);
 
       console.log("[Even Now Playing] EvenHub event", event);
+      lastEvenEventSummary = summarizeEvenEvent(event, normalizedEventType);
+      render();
 
       if (normalizedEventType === "click") {
         activateEventControl(event);
@@ -604,7 +608,26 @@ function controlIndexFromListEvent(event: {
     return itemIndex;
   }
 
+  if (event.listEvent) {
+    return 0;
+  }
+
   return undefined;
+}
+
+function summarizeEvenEvent(
+  event: {
+    listEvent?: { eventType?: unknown; currentSelectItemIndex?: number; currentSelectItemName?: string };
+    textEvent?: { eventType?: unknown };
+    sysEvent?: { eventType?: unknown };
+  },
+  normalizedEventType: string,
+) {
+  const listEvent = event.listEvent;
+  const rawEventType = listEvent?.eventType ?? event.textEvent?.eventType ?? event.sysEvent?.eventType;
+  const itemName = normalizedControlLabel(listEvent?.currentSelectItemName) ?? "-";
+  const itemIndex = listEvent?.currentSelectItemIndex ?? "-";
+  return `event:${normalizedEventType} raw:${String(rawEventType ?? "-")} idx:${itemIndex} name:${itemName} sel:${selectedControl().action}`;
 }
 
 function updateSelectedControlIndex(nextIndex: number) {
