@@ -35,8 +35,17 @@ type BridgeResponse = {
   };
 };
 
-type BridgeCommand = "next" | "previous" | "play-pause" | "play" | "pause";
-type ControlAction = "previous" | "play-pause" | "next";
+type BridgeCommand =
+  | "next"
+  | "previous"
+  | "play-pause"
+  | "play"
+  | "pause"
+  | "seek-back-5"
+  | "seek-forward-5"
+  | "like"
+  | "shuffle";
+type ControlAction = "seek-back-5" | "previous" | "play-pause" | "next" | "seek-forward-5" | "like" | "shuffle";
 
 type PlayerControl = {
   action: ControlAction;
@@ -45,9 +54,11 @@ type PlayerControl = {
 
 const ANDROID_BRIDGE_URL = "http://127.0.0.1:8765";
 const controls: PlayerControl[] = [
+  { action: "seek-back-5", label: "-5" },
   { action: "previous", label: "<<" },
   { action: "play-pause", label: "||" },
   { action: "next", label: ">>" },
+  { action: "seek-forward-5", label: "+5" },
 ];
 
 const demoTracks: TrackState[] = [
@@ -122,7 +133,10 @@ function render() {
         <p>${escapeHtml(track.artist)}</p>
       </div>
 
-      <div class="controls three-controls" aria-label="Playback controls">
+      <div class="controls five-controls" aria-label="Playback controls">
+        <button class="seek-button ${selectedClass("seek-back-5")}" data-action="seek-back-5" aria-label="Back 5 seconds">
+          -5
+        </button>
         <button class="icon-button secondary ${selectedClass("previous")}" data-action="previous" aria-label="Previous track">
           <span class="previous-icon" aria-hidden="true"></span>
         </button>
@@ -131,6 +145,9 @@ function render() {
         </button>
         <button class="icon-button secondary ${selectedClass("next")}" data-action="next" aria-label="Next track">
           <span class="next-icon" aria-hidden="true"></span>
+        </button>
+        <button class="seek-button ${selectedClass("seek-forward-5")}" data-action="seek-forward-5" aria-label="Forward 5 seconds">
+          +5
         </button>
       </div>
 
@@ -184,7 +201,7 @@ async function updateGlassesText() {
     updateText(1, "title", displayTrackTitle()),
     updateText(2, "artist", displayTrackArtist()),
     updateText(3, "progress", progressWithTimeText()),
-    updateText(5, "divider", "|\n|\n|\n|\n|"),
+    updateText(5, "divider", "|\n|\n|\n|\n|\n|"),
   ]);
 }
 
@@ -194,7 +211,7 @@ function glassesPageObjects() {
       textContainer(1, "title", 44, 38, 344, 34, displayTrackTitle()),
       textContainer(2, "artist", 64, 84, 324, 30, displayTrackArtist()),
       textContainer(3, "progress", 46, 132, 342, 34, progressWithTimeText()),
-      textContainer(5, "divider", 410, 40, 18, 166, "|\n|\n|\n|\n|"),
+      textContainer(5, "divider", 410, 26, 18, 210, "|\n|\n|\n|\n|\n|"),
     ],
     listObject: [controlsListContainer(4, "controls")],
   };
@@ -229,9 +246,9 @@ function controlsListContainer(
     containerID,
     containerName,
     xPosition: 438,
-    yPosition: 40,
-    width: 86,
-    height: 142,
+    yPosition: 24,
+    width: 92,
+    height: 210,
     borderWidth: 0,
     borderColor: 0,
     borderRadius: 8,
@@ -390,9 +407,29 @@ function activateControlIndex(controlIndex: number) {
 }
 
 function runControlAction(action: ControlAction | string) {
+  if (action === "seek-back-5") seekBack5();
   if (action === "next") nextTrack();
   if (action === "previous") previousTrack();
   if (action === "play-pause") playPause();
+  if (action === "seek-forward-5") seekForward5();
+  if (action === "like") likeTrack();
+  if (action === "shuffle") shuffle();
+}
+
+function seekBack5() {
+  void runCommand("seek-back-5");
+}
+
+function seekForward5() {
+  void runCommand("seek-forward-5");
+}
+
+function likeTrack() {
+  void runCommand("like");
+}
+
+function shuffle() {
+  void runCommand("shuffle");
 }
 
 function nextTrack() {
@@ -443,14 +480,27 @@ function scheduleFollowUpRefreshes() {
 }
 
 function runDemoCommand(command: BridgeCommand) {
-  if (command === "next") {
+  if (command === "seek-back-5") {
+    track = { ...track, positionMs: Math.max(0, currentPositionMs() - 5000), positionUpdatedAtMs: Date.now(), updatedAt: Date.now() };
+  } else if (command === "seek-forward-5") {
+    const durationMs = track.durationMs ?? 0;
+    const nextPositionMs = currentPositionMs() + 5000;
+    track = {
+      ...track,
+      positionMs: durationMs > 0 ? Math.min(durationMs, nextPositionMs) : nextPositionMs,
+      positionUpdatedAtMs: Date.now(),
+      updatedAt: Date.now(),
+    };
+  } else if (command === "next") {
     trackIndex = (trackIndex + 1) % demoTracks.length;
     track = { ...demoTracks[trackIndex], updatedAt: Date.now(), isPlaying: true };
   } else if (command === "previous") {
     trackIndex = (trackIndex + demoTracks.length - 1) % demoTracks.length;
     track = { ...demoTracks[trackIndex], updatedAt: Date.now(), isPlaying: true };
-  } else {
+  } else if (command === "play-pause" || command === "play" || command === "pause") {
     track = { ...track, isPlaying: !track.isPlaying, updatedAt: Date.now() };
+  } else {
+    track = { ...track, updatedAt: Date.now() };
   }
 
   render();

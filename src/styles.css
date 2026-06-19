@@ -122,6 +122,12 @@ button {
   gap: 44px;
 }
 
+.controls.five-controls {
+  grid-template-columns: 56px 62px 84px 62px 56px;
+  justify-content: center;
+  gap: 18px;
+}
+
 .icon-button {
   position: relative;
   display: grid;
@@ -155,6 +161,39 @@ button {
   border-radius: 50%;
   background: #ffffff;
   color: #050505;
+}
+
+.seek-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.seek-button::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.seek-button.selected::before {
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.22);
+}
+
+.controls.five-controls .icon-button.primary {
+  width: 84px;
 }
 
 .icon-button.primary.selected::before {
@@ -309,8 +348,22 @@ button {
     gap: 26px;
   }
 
+  .controls.five-controls {
+    grid-template-columns: 42px 48px 64px 48px 42px;
+    gap: 11px;
+  }
+
   .icon-button.primary {
     width: 82px;
+  }
+
+  .seek-button {
+    width: 42px;
+    font-size: 14px;
+  }
+
+  .controls.five-controls .icon-button.primary {
+    width: 64px;
   }
 
   .track h1 {

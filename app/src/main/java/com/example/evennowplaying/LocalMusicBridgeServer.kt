@@ -111,6 +111,10 @@ class LocalMusicBridgeServer(
             "play-pause" -> controller.playPause()
             "play" -> controller.play()
             "pause" -> controller.pause()
+            "seek-back-5" -> controller.seekBackFiveSeconds()
+            "seek-forward-5" -> controller.seekForwardFiveSeconds()
+            "like" -> controller.likeTrack()
+            "shuffle" -> controller.toggleShuffle()
             else -> {
                 return JSONObject()
                     .put("ok", false)
