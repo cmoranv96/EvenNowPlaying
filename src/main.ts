@@ -45,9 +45,9 @@ type PlayerControl = {
 
 const ANDROID_BRIDGE_URL = "http://127.0.0.1:8765";
 const controls: PlayerControl[] = [
-  { action: "previous", label: "◀" },
-  { action: "play-pause", label: "⏯" },
-  { action: "next", label: "▶" },
+  { action: "previous", label: "<<" },
+  { action: "play-pause", label: "||" },
+  { action: "next", label: ">>" },
 ];
 
 const demoTracks: TrackState[] = [
@@ -179,29 +179,23 @@ async function updateGlassesText() {
   if (!evenBridge) return;
 
   await Promise.all([
-    updateText(1, "title", track.title),
-    updateText(2, "artist", track.artist),
-    updateText(3, "progress", progressBarText(estimateProgressPercent())),
-    updateText(5, "status", glassesStatusText()),
+    updateText(1, "title", displayTrackTitle()),
+    updateText(2, "artist", displayTrackArtist()),
+    updateText(3, "progress", progressWithTimeText()),
+    updateText(5, "divider", "|\n|\n|\n|\n|"),
   ]);
 }
 
 function glassesPageObjects() {
   return {
     textObject: [
-      textContainer(1, "title", 24, 26, 528, 58, track.title),
-      textContainer(2, "artist", 24, 82, 528, 36, track.artist),
-      textContainer(3, "progress", 24, 126, 528, 34, progressBarText(estimateProgressPercent())),
-      textContainer(5, "status", 24, 248, 528, 24, glassesStatusText()),
+      textContainer(1, "title", 44, 38, 344, 34, displayTrackTitle()),
+      textContainer(2, "artist", 64, 84, 324, 30, displayTrackArtist()),
+      textContainer(3, "progress", 46, 132, 342, 34, progressWithTimeText()),
+      textContainer(5, "divider", 410, 40, 18, 166, "|\n|\n|\n|\n|"),
     ],
     listObject: [controlsListContainer(4, "controls")],
   };
-}
-
-function glassesStatusText() {
-  if (youtubeMusicConnected) return "swipe to choose  ·  tap to play";
-  if (androidBridgeConnected) return "Open YouTube Music";
-  return "Open Android companion";
 }
 
 function textContainer(
@@ -232,19 +226,20 @@ function controlsListContainer(
   return new ListContainerProperty({
     containerID,
     containerName,
-    xPosition: 216,
-    yPosition: 158,
-    width: 144,
-    height: 84,
+    xPosition: 438,
+    yPosition: 40,
+    width: 86,
+    height: 142,
     borderWidth: 0,
+    borderColor: 0,
     borderRadius: 8,
-    paddingLength: 0,
+    paddingLength: 2,
     isEventCapture: 1,
     itemContainer: new ListItemContainerProperty({
       itemCount: controls.length,
       itemWidth: 0,
       isItemSelectBorderEn: 1,
-      itemName: controls.map(displayLabel),
+      itemName: controls.map(displayListLabel),
     }),
   });
 }
@@ -272,6 +267,20 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
+function displayTrackTitle() {
+  return truncateForHud(track.title, 24);
+}
+
+function displayTrackArtist() {
+  return truncateForHud(track.artist, 22);
+}
+
+function truncateForHud(value: string, maxLength: number) {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, Math.max(0, maxLength - 1))}…`;
+}
+
 function estimateProgressPercent() {
   const durationMs = track.durationMs ?? 0;
   const basePositionMs = track.positionMs ?? 0;
@@ -286,9 +295,36 @@ function estimateProgressPercent() {
 }
 
 function progressBarText(percent: number) {
-  const slots = 24;
+  const slots = 8;
   const thumb = Math.max(1, Math.min(slots - 2, Math.round((percent / 100) * slots)));
   return Array.from({ length: slots }, (_, index) => (index === thumb ? "●" : "━")).join("");
+}
+
+function currentPositionMs() {
+  const durationMs = track.durationMs ?? 0;
+  const basePositionMs = track.positionMs ?? 0;
+  const elapsedMs =
+    track.isPlaying && track.positionUpdatedAtMs
+      ? Math.max(0, Date.now() - track.positionUpdatedAtMs)
+      : 0;
+
+  if (durationMs <= 0) return basePositionMs;
+  return Math.min(durationMs, basePositionMs + elapsedMs);
+}
+
+function progressWithTimeText() {
+  const durationMs = track.durationMs ?? 0;
+  const positionMs = currentPositionMs();
+  return `${formatTime(positionMs)} ${progressBarText(estimateProgressPercent())} ${formatTime(durationMs)}`;
+}
+
+function formatTime(ms: number) {
+  if (!Number.isFinite(ms) || ms <= 0) return "0:00";
+
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function selectedControl() {
@@ -301,6 +337,10 @@ function selectedClass(action: ControlAction) {
 
 function displayLabel(control: PlayerControl) {
   return control.label;
+}
+
+function displayListLabel(control: PlayerControl) {
+  return `  ${control.label}  `;
 }
 
 function moveSelection(direction: -1 | 1) {
@@ -521,7 +561,9 @@ function syncSelectionFromListEvent(event: {
     return true;
   }
 
-  const nameIndex = controls.findIndex((control) => displayLabel(control) === itemName);
+  const nameIndex = controls.findIndex((control, index) => {
+    return displayLabel(control) === itemName || displayListLabel(control) === itemName;
+  });
   if (nameIndex >= 0) {
     updateSelectedControlIndex(nameIndex);
     return true;
